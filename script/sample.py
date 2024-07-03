@@ -1,3 +1,4 @@
+import soundfile as sf
 import numpy as np
 import ffprobe3
 import librosa
@@ -81,7 +82,7 @@ class Sample:
         
         self.sample_data = SampleData(o, o_sr, y, _y)
     
-    def generate_inputs(self, bs):
+    def generate_inputs(self, bs, device):
         _y = self.sample_data._y
         inputs = []
         for i in range(_y.shape[0]):
@@ -90,23 +91,24 @@ class Sample:
             inputs.append(melspec)
 
         inputs = np.array(inputs).astype(np.float32)
-        inputs = torch.from_numpy(np.array([inputs]))
+        inputs = torch.from_numpy(np.array([inputs])).to(device)
         inputs = inputs.permute(1, 0, 2, 3)
 
         batches = int(math.ceil(inputs.shape[0]/bs))
         
+        self.bs = bs
         self.sample_data.inputs = inputs
         self.sample_data.batches = batches
 
-    def infer(self, model, bs):
+    def infer(self, model):
         batches = self.sample_data.batches
         inputs = self.sample_data.inputs
         print("Starting inference...")
         outputs = []
         with torch.no_grad():
             for b in tqdm(range(batches)):
-                start = b*bs
-                end = (b+1)*bs if b != (batches - 1) else inputs.shape[0]
+                start = b*self.bs
+                end = (b+1)*self.bs if b != (batches - 1) else inputs.shape[0]
                 batch = inputs[start:end]
                 
                 outputs += model(batch)
@@ -117,3 +119,18 @@ class Sample:
         outputs = np.array(outputs)
         steps = outputs.reshape((outputs.shape[0]*outputs.shape[1], outputs.shape[2])) #flatten since we do not need the extra clip dimension
         return steps
+    
+    #sample_length, ori_length: int, include_op=False, include_ed=False
+    def get_args(self):
+        return [self.sample_data.y.shape[0], self.include_op, self.include_ed]
+    
+    def save_output(self, audio_segments: np.ndarray):
+        audio = np.array([])
+        sr_correction = self.sample_data.o_sr/self.target_sr
+        for i in range(len(audio_segments)):
+            segment = audio_segments[i]
+            start = int(segment[0]*sr_correction)
+            stop = int(segment[-1]*sr_correction)
+            audio = np.concatenate((audio, self.sample_data.o[start:stop + 1]))
+            
+        sf.write(self.output_file, audio, self.sample_data.o_sr)
