@@ -1,7 +1,8 @@
+import enlighten
 import numpy as np
 
-from tqdm import tqdm
 from dataclasses import dataclass, field
+from utils import *
 
 @dataclass
 class LabelConfig:
@@ -33,14 +34,14 @@ class Segments:
         }
     
     def get_segments(self, sample_length, ori_length: int, include_op=False, include_ed=False):
-        
         classes = 2
         time_steps = 30
         samples_per_segment = sample_length/time_steps
         
-        print("Processing Inputs...")
+        
+        filtering_progress: TieredCounter = manager.counter(level=2, keep_children=False, desc="Filtering Outputs:", unit="classes", total=classes)
+        
         for c in range(classes):
-            print(f' -- Class: {self.class_map[c].name} -- ')
             min_val = np.min(self.steps[:, c*3])
             max_val = np.max(self.steps[:, c*3])
             
@@ -50,9 +51,9 @@ class Segments:
             thresh = label_conf.threshold
             smooth_terms = label_conf.smooth_n
             
+            class_progress: TieredCounter = manager.counter(level=3, keep_children=False, desc=f'{label_conf.name}:', unit="segments", total=len(self.steps))
             
-            threshold_progress = tqdm(range(len(self.steps)))
-            for i in threshold_progress:
+            for i in range(len(self.steps)):
                 step = self.steps[i]
                 step_samples_offset = i*samples_per_segment
                 valid = step[c*3]
@@ -115,18 +116,30 @@ class Segments:
                     stop_time = step_samples_offset + stop*samples_per_segment
                     label_conf.events.append((valid, start_time, stop_time))
                 if label_conf.verbose: print(f'{valid}')
-
+                class_progress.update()
+            filtering_progress.update()
+        filtering_progress.close_children()
+        
         #Add in padding
-        for idx, label_conf in self.class_map.items():
+        padding_progress: TieredCounter = manager.counter(level=2, keep_children=False, desc="Padding Events:", unit="classes", total=classes)
+        for label_conf in self.class_map.values():
+            class_progress: TieredCounter = manager.counter(level=3, keep_children=False, desc=f'{label_conf.name}:', unit="events", total=len(label_conf.events))
+            
             for i in range(0, len(label_conf.events)):
                 curr = label_conf.events[i]
                 new_start = max(0, curr[1] - sample_length*label_conf.padding[0]) 
                 new_stop = min(ori_length - 1, curr[1] + sample_length*label_conf.padding[1])
                 label_conf.events[i] = (curr[0], new_start, new_stop)
-                
+                class_progress.update()
+            padding_progress.update()
+        padding_progress.close_children()
+        
         #Smooth close segments together, otherwise the subsequent clip concatentation is very slow
+        smoothing_progress: TieredCounter = manager.counter(level=2, keep_children=False, desc="Smoothing Events:", unit="classes", total=classes)
         smoothing = .1
         for label_conf in self.class_map.values():
+            class_progress: TieredCounter = manager.counter(level=3, keep_children=False, desc=f'{label_conf.name}:', unit="events", total=len(label_conf.events))
+            
             previous_pointer = 0
             for i in range(1, len(label_conf.events)):
                 prev = label_conf.events[previous_pointer]
@@ -135,31 +148,48 @@ class Segments:
                     label_conf.events[i] = (curr[0], prev[1], curr[2])
                     label_conf.events[previous_pointer] = None
                 previous_pointer = i
+                class_progress.update()
             label_conf.events = list(filter(lambda x: x, label_conf.events))
+            
+            smoothing_progress.update()
+        smoothing_progress.close_children()
 
         sampled_idx = np.array([]) #build a list of samples that we included, so we can correctly build the oped included version without duplication
         speech_class = self.class_map[0]
+        speech_progress: TieredCounter = manager.counter(level=2, keep_children=False, desc="Consolidating Speech Segments:", unit="segments", total=len(speech_class.events))
         for i in range(0, len(speech_class.events)): 
             clip_start = speech_class.events[i][1]
             clip_stop = speech_class.events[i][2]
             
             all_samples = np.linspace(int(clip_start), int(clip_stop), num=(int(clip_stop) - int(clip_start) + 1), dtype=np.uint32)
             sampled_idx = np.concatenate((sampled_idx, all_samples))
+            speech_progress.update()
         
-        oped_class = self.class_map[1]
-        for i in range(0, len(oped_class.events)):
-            clip_start = oped_class.events[i][1]
-            clip_stop = oped_class.events[i][2]
+        
+        if include_ed or include_op:
+            oped_class = self.class_map[1]
             
-            all_samples = np.linspace(int(clip_start), int(clip_stop), num=(int(clip_stop) - int(clip_start) + 1), dtype=np.uint32)
+            oped_progress: TieredCounter = manager.counter(level=2, keep_children=False, desc="Consolidating OPED Segments:", unit="segments", total=len(oped_class.events))
+            for i in range(0, len(oped_class.events)):
+                clip_start = oped_class.events[i][1]
+                clip_stop = oped_class.events[i][2]
+                
+                all_samples = np.linspace(int(clip_start), int(clip_stop), num=(int(clip_stop) - int(clip_start) + 1), dtype=np.uint32)
+                
+                if clip_start >= (ori_length/2)*samples_per_segment:
+                    if include_ed: sampled_idx = np.concatenate((sampled_idx, all_samples))
+                else:
+                    if include_op: sampled_idx = np.concatenate((sampled_idx, all_samples))
+                oped_progress.update()
             
-            if clip_start >= (ori_length/2)*samples_per_segment:
-                if include_ed: sampled_idx = np.concatenate((sampled_idx, all_samples))
-            else:
-                if include_op: sampled_idx = np.concatenate((sampled_idx, all_samples))
-
         sampled_idx = np.unique(sampled_idx)
         np.sort(sampled_idx)
 
         sampled_idx = consecutive(sampled_idx)
         return sampled_idx  
+    
+    def reset(self):
+        self.steps = None
+        for v in self.class_map.values():
+            v.events = None
+        self.class_map = None

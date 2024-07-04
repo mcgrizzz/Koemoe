@@ -1,15 +1,16 @@
 import soundfile as sf
 import numpy as np
+import enlighten
 import ffprobe3
 import librosa
 import torch
 import math
 
-from tqdm import tqdm
 from pathlib import Path
 from typing import Tuple, Union
 from ffmpeg import FFmpeg, FFmpegError
 from dataclasses import dataclass, field
+from utils import *
 
 @dataclass
 class SampleData:
@@ -24,6 +25,7 @@ class SampleData:
 class Sample:
     input_file: Path
     output_dir: Path
+    output_format: str
     temp_dir: Path
     include_op: bool = False
     include_ed: bool = False
@@ -33,7 +35,7 @@ class Sample:
     def __post_init__(self):
         self.name = self.input_file.stem
 
-        self.output_file = self.output_dir / (self.name + "_condensed.wav")
+        self.output_file = self.output_dir / self.output_format.replace("$name$", self.name)
         self.audio_file = self.temp_dir / (self.name + '.wav')
         
     def generate_audio(self):
@@ -85,10 +87,14 @@ class Sample:
     def generate_inputs(self, bs, device):
         _y = self.sample_data._y
         inputs = []
+        
+        input_progress: TieredCounter = manager.counter(level=2, keep_children=False, desc="Generating Inputs:", unit="segments", total=_y.shape[0])
+        
         for i in range(_y.shape[0]):
             melspec = librosa.feature.melspectrogram(y=_y[i], sr=self.target_sr, hop_length=160)
             melspec = librosa.power_to_db(melspec, ref=np.max)
             inputs.append(melspec)
+            input_progress.update()
 
         inputs = np.array(inputs).astype(np.float32)
         inputs = torch.from_numpy(np.array([inputs])).to(device)
@@ -103,15 +109,19 @@ class Sample:
     def infer(self, model):
         batches = self.sample_data.batches
         inputs = self.sample_data.inputs
-        print("Starting inference...")
         outputs = []
-        with torch.no_grad():
-            for b in tqdm(range(batches)):
+        
+        infer_progress: TieredCounter = manager.counter(level=2, keep_children=False, desc="Inferring:", unit="batches", total=batches)
+        
+        with torch.inference_mode():
+            for b in range(batches):
                 start = b*self.bs
                 end = (b+1)*self.bs if b != (batches - 1) else inputs.shape[0]
                 batch = inputs[start:end]
                 
-                outputs += model(batch)
+                with nowarning():
+                    outputs += model(batch)
+                infer_progress.update()
 
         for i in range(len(outputs)):
             outputs[i] = outputs[i].cpu()
@@ -127,10 +137,21 @@ class Sample:
     def save_output(self, audio_segments: np.ndarray):
         audio = np.array([])
         sr_correction = self.sample_data.o_sr/self.target_sr
+        
+        save_progress: TieredCounter = manager.counter(level=2, keep_children=False, desc="Saving:", unit="segments", total=len(audio_segments))
+        
         for i in range(len(audio_segments)):
             segment = audio_segments[i]
             start = int(segment[0]*sr_correction)
             stop = int(segment[-1]*sr_correction)
             audio = np.concatenate((audio, self.sample_data.o[start:stop + 1]))
+            save_progress.update()
             
         sf.write(self.output_file, audio, self.sample_data.o_sr)
+
+    def reset(self):
+        self.sample_data.o = None
+        self.sample_data.y = None
+        self.sample_data._y = None
+        self.sample_data = None
+        

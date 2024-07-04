@@ -1,3 +1,4 @@
 models/*
 checkpoints/*
 .ipynb_checkpoints/*
+.vscode/*
