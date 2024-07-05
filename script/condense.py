@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 import sys
 import os
@@ -27,6 +26,7 @@ parser.add_argument('--include-op', "-io", action='store_true', help="include th
 parser.add_argument('--include-ed', "-ie", action='store_true', help="include the ED in the condensed file")
 parser.add_argument('--output-dir', "-o", type=Path, help="change the output directory")
 parser.add_argument('--output-format', "-f", type=str, default="$name$_condensed.wav", help="change the output file name (default: $name$_condensed.wav)")
+#tested output_formats = ["wav", "flac", "mp3", NO:"ogg"]
 
 args = parser.parse_args()
 

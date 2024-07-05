@@ -12,8 +12,6 @@ from dataclasses import dataclass, field
 
 progress_colors = {.25: [237, 226, 225], .50: [237, 205, 202], .75: [237, 172, 166], 1: [238, 124, 114]}
 
-#finished_color = "lightsalmon2"
-
 class TieredCounter(Counter):
     level: int
     prefix: str

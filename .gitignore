@@ -2,3 +2,4 @@ models/*
 checkpoints/*
 .ipynb_checkpoints/*
 .vscode/*
+script/__pycache__/*

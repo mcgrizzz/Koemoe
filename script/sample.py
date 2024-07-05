@@ -1,16 +1,16 @@
 import soundfile as sf
 import numpy as np
-import enlighten
+from utils import *
+import patch_ffprobe
 import ffprobe3
 import librosa
 import torch
 import math
 
 from pathlib import Path
-from typing import Tuple, Union
 from ffmpeg import FFmpeg, FFmpegError
 from dataclasses import dataclass, field
-from utils import *
+
 
 @dataclass
 class SampleData:
@@ -39,6 +39,7 @@ class Sample:
         self.audio_file = self.temp_dir / (self.name + '.wav')
         
     def generate_audio(self):
+        #ffprobe3.ffprobe3._SPLIT_COMMAND_LINE = self._SPLIT_COMMAND_LINE
         if not self.audio_file.exists():
             ffprobe_output = ffprobe3.probe(str(self.input_file))    
 
@@ -124,8 +125,8 @@ class Sample:
                 infer_progress.update()
 
         for i in range(len(outputs)):
-            outputs[i] = outputs[i].cpu()
-
+            outputs[i] = outputs[i].cpu().numpy()
+            
         outputs = np.array(outputs)
         steps = outputs.reshape((outputs.shape[0]*outputs.shape[1], outputs.shape[2])) #flatten since we do not need the extra clip dimension
         return steps
