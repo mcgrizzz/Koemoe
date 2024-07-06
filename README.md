@@ -8,7 +8,7 @@
 
 Koemoe can create condensed audio from anime without the need for subtitles. It uses a ML model based on [KOHO](https://arxiv.org/abs/2109.00962) and [convnext](https://arxiv.org/abs/2201.03545). 
 
-Please see the [Documentation](https://condense.moe/) for installation and usage information.
+Please see the **[Documentation](https://condense.moe/)** for installation and usage information.
 
 ## Features
 
@@ -18,8 +18,8 @@ Please see the [Documentation](https://condense.moe/) for installation and usage
 
 ## Support
 
--   For questions and discussion, use **[Discussions]**.
--   To report a bug or make a feature request, open an **[Issue]**.
+-   For questions or discussions use **[Discussions](https://github.com/mcgrizzz/Koemoe/discussions)**.
+-   If you find a bug or have a request, open an **[Issue](https://github.com/mcgrizzz/Koemoe/issues)**.
 
 ## Links
 
