@@ -1,7 +1,8 @@
 
-<img align="left" width="80" height="80" src="https://condense.moe/images/logo.png" alt="logo">
+<img align="left" width="60" height="60" src="https://condense.moe/images/logo.png" alt="logo">
 
 # Koemoe
+
 
 > *Subtitle-naive dialogue extraction from anime for Japanese language learning*
 
