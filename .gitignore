@@ -2,4 +2,5 @@ models/*
 checkpoints/*
 .ipynb_checkpoints/*
 .vscode/*
-script/__pycache__/*
+koemoe/__pycache__/*
+koemoe/model/*
