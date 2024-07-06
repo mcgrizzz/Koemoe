@@ -149,6 +149,7 @@ class Sample:
             save_progress.update()
             
         sf.write(self.output_file, audio, self.sample_data.o_sr)
+        return audio.shape[0]/self.sample_data.o_sr
 
     def reset(self):
         self.sample_data.o = None

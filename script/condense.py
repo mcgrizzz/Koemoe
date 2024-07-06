@@ -15,12 +15,12 @@ from utils import *
 from sample import Sample
 from segment import Segments
 
-status:enlighten.StatusBar = manager.status_bar(status_format=u'[Koe.moe]{fill}{stage}{fill}{elapsed}',
+status:enlighten.StatusBar = manager.status_bar(status_format=u'[Koemoe]{fill}{stage}{fill}{elapsed}',
                                     color='bold_underline_mistyrose_on_firebrick1',
                                     justify=enlighten.Justify.CENTER, stage='Initializing'.upper(),
                                     autorefresh=True, min_delta=0.5)
 
-parser = argparse.ArgumentParser(prog="Koe.moe")
+parser = argparse.ArgumentParser(prog="Koemoe")
 parser.add_argument('input', type=Path, help="The input file or directory")
 parser.add_argument('--include-op', "-io", action='store_true', help="include the OP in the condensed file")
 parser.add_argument('--include-ed', "-ie", action='store_true', help="include the ED in the condensed file")
@@ -67,7 +67,7 @@ status.update(stage="Loading Model")
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #device = torch.device("cpu") #test cpu inference
-model_path = Path("H:/Documents/Dev/ML/Koe.moe/checkpoints/latest.pt")
+model_path = Path("model/latest.pt")
 model = torch.load(model_path)
 model.to(device)
 model.eval()
@@ -77,6 +77,9 @@ bs = 128 if device.type != "cpu" else 32
 sr = 16000
 len_sec = 6
 len_samples = len_sec*sr
+
+input_total_time: float = 0
+output_total_time: float = 0
 
 sample_map = {}
 status.update(stage="Generating Audio Files".upper())
@@ -100,6 +103,7 @@ for input_file in input_files:
     sample.load_audio(sr, len_samples)
     sample_progress.update()
     print(f'INFO: Audio Loaded')
+    input_total_time += sample.sample_data.o.shape[0]/sample.sample_data.o_sr
     
     #sub_progress.set_description("Generating Model Inputs")
     sample.generate_inputs(bs, device)
@@ -118,13 +122,15 @@ for input_file in input_files:
     print(f'INFO: Model Outputs Processed')
     
     #sub_progress.set_description("Saving File")
-    sample.save_output(processed)
+    output_time = sample.save_output(processed)
     sample.reset()
     segments.reset()
     sample_progress.update()
     sample_progress.close()
     sub_progress.update()
     print(f'INFO: Saved output to "{str(sample.output_file)}"')
+    
+    output_total_time += output_time
     
 status.update(stage="Cleaning Up".upper(), force=True)
 temps = os.listdir(temp_dir)
@@ -142,4 +148,10 @@ print(f'INFO: Completed')
 status.update(stage="Completed".upper(), force=True)
 
 time_elapsed = format_time(status.elapsed).split(":")
-print(f'INFO: Processed {len(input_files)} file(s) in {time_elapsed[0]}m {time_elapsed[1]}s')
+input_runtime = format_time(input_total_time).split(":")
+output_runtime = format_time(output_total_time).split(":")
+reduction = round(((input_total_time - output_total_time)/input_total_time)*100, 2)
+print(f'=========== SUMMARY ===========')
+print(f'Processed {len(input_files)} file(s)')
+print(f'Compressed runtime {input_runtime[0]}m {input_runtime[1]}s -> {output_runtime[0]}m {output_runtime[1]}s ({reduction}% reduction)')
+print(f'Processing took a total of {time_elapsed[0]}m {time_elapsed[1]}s')
