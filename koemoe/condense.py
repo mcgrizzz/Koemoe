@@ -42,6 +42,7 @@ else:
     input_files += mp4s
 
 if not len(input_files):
+    status.update(stage="Error".upper(), force=True)
     print("ERROR: No input files found")
     sys.exit()
     
@@ -63,11 +64,18 @@ else:
     output_dir.mkdir(exist_ok=True)
     print(f'INFO: {str(output_dir)} Created')
 
-status.update(stage="Loading Model")
+status.update(stage="Loading Model".upper())
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #device = torch.device("cpu") #test cpu inference
-model_path = Path("model/latest.pt")
+print(f'INFO: Finding Newest Model')
+newest = get_latest_model()
+if newest == "None":
+    status.update(stage="Error".upper(), force=True)
+    print("ERROR: No model files found. Please check https://github.com/mcgrizzz/Koemoe/releases for the latest model")
+    sys.exit()
+print(f'INFO: Loading \'{newest}\' ...')
+model_path = Path("model/") / newest
 model = torch.load(model_path)
 model.to(device)
 model.eval()

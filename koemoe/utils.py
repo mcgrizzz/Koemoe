@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-import io
+import os
+
 import sys
 import warnings
 import enlighten
 import contextlib
+import pkg_resources
 
+from pathlib import Path
 from enlighten._counter import Counter 
 from functools import partial
 from dataclasses import dataclass, field
@@ -64,8 +67,6 @@ class TieredCounter(Counter):
     def to_string(self):
         return f'({self.level}, [{self.parent}/{self.trimmed_desc}])'
         
-        
-
 class TieredManager(enlighten.Manager): 
     
     def __init__(self, **kwargs):
@@ -116,3 +117,13 @@ def nowarning():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         yield
+        
+def get_latest_model():
+    models = os.listdir(Path("./model"))
+    latest_version = ("None", pkg_resources.parse_version("0.0"))
+    for file_name in models:
+        file = Path(file_name).stem
+        version = pkg_resources.parse_version(file.split("_")[-1])
+        if version > latest_version[1]:
+            latest_version = (file_name, version)
+    return latest_version[0]
