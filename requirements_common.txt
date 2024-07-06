@@ -1,0 +1,5 @@
+fastai==2.7.15
+librosa==0.10.2.post1
+python-ffmpeg==2.0.12
+ffprobe3-python3 @ git+https://github.com/jboy/ffprobe3-python3.git@1aa2baa4a9197b5180b3a95836b6667f491fcbe0
+enlighten==1.12.4

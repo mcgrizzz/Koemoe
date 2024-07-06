@@ -31,8 +31,17 @@ parser.add_argument('--output-format', "-f", type=str, default="$name$_condensed
 args = parser.parse_args()
 
 input_files = []
-
 input: Path = args.input
+
+sr = 16000
+len_sec = 6
+len_samples = len_sec*sr
+
+input_total_time: float = 0
+output_total_time: float = 0
+
+sample_map = {}
+
 if input.is_file():
     input_files.append(input)
 else:
@@ -74,22 +83,15 @@ if newest == "None":
     status.update(stage="Error".upper(), force=True)
     print("ERROR: No model files found. Please check https://github.com/mcgrizzz/Koemoe/releases for the latest model")
     sys.exit()
-print(f'INFO: Loading \'{newest}\' ...')
+print(f'INFO: Loading \'{newest}\' using \`{device}\` ...')
 model_path = Path("model/") / newest
-model = torch.load(model_path)
-model.to(device)
+model = torch.load(model_path, map_location=device)
+#model.to(device)
 model.eval()
 print(f'INFO: Model Loaded')
 
 bs = 128 if device.type != "cpu" else 32
-sr = 16000
-len_sec = 6
-len_samples = len_sec*sr
 
-input_total_time: float = 0
-output_total_time: float = 0
-
-sample_map = {}
 status.update(stage="Generating Audio Files".upper())
 sub_progress: TieredCounter = manager.counter(desc="Generating Audio:", total=len(input_files))
 for input_file in input_files:
