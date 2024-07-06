@@ -23,4 +23,8 @@ Please see the **[Documentation](https://condense.moe/)** for installation and u
 
 ## Links
 
+- [condense.moe](https://condense.moe/)
+
 ## License
+
+**[MIT License](LICENSE)**
