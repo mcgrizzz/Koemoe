@@ -13,7 +13,7 @@ from enlighten._counter import Counter
 from functools import partial
 from dataclasses import dataclass, field
 
-progress_colors = {.25: [237, 226, 225], .50: [237, 205, 202], .75: [237, 172, 166], 1: [238, 124, 114]}
+progress_colors = [[237, 226, 225], [237, 205, 202], [237, 172, 166], [238, 124, 114]]
 
 class TieredCounter(Counter):
     level: int
@@ -44,9 +44,8 @@ class TieredCounter(Counter):
     
     def update(self, incr=1, force=False, **fields):
         prog_fract = (self.count + incr)/self.total
-        for k, v in progress_colors.items():
-            if prog_fract >= k:
-                self.color = v
+        index = int((len(progress_colors) - 1)*prog_fract)
+        self.color = progress_colors[index]
         super().update(incr, force, **fields)
         
     def add_child(self, child: TieredCounter):
@@ -120,6 +119,7 @@ def nowarning():
         
 def get_latest_model():
     models = os.listdir(Path("./model"))
+    models.remove('.gitkeep')
     latest_version = ("None", pkg_resources.parse_version("0.0"))
     for file_name in models:
         file = Path(file_name).stem

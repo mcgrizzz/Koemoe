@@ -39,7 +39,7 @@ class Sample:
         self.audio_file = self.temp_dir / (self.name + '.wav')
         
     def generate_audio(self):
-        #ffprobe3.ffprobe3._SPLIT_COMMAND_LINE = self._SPLIT_COMMAND_LINE
+        #codec_map = {"aac": "m4a", "mp3": "mp3", "opus": "opus", "vorbis": "ogg"}
         if not self.audio_file.exists():
             ffprobe_output = ffprobe3.probe(str(self.input_file))    
 
@@ -70,7 +70,21 @@ class Sample:
                 print("- Arguments to execute ffmpeg:", " ".join(exception.arguments))
     
     def load_audio(self, target_sr, sample_len):
-        o,o_sr = librosa.load(self.audio_file, sr=None)
+        
+        o_sr = librosa.get_samplerate(self.audio_file)
+        frame_length = (4096)
+        hop_length = (2048)
+        
+        stream = librosa.stream(self.audio_file, block_length=256, frame_length=frame_length, hop_length=hop_length)
+        
+        segments = list(stream)
+        o = np.array([])
+        load_progress: TieredCounter = manager.counter(level=2, keep_children=False, desc="Loading Audio:", unit="blocks", total=len(segments))
+        for s in segments:
+            o = np.concatenate((o, s))
+            load_progress.update()
+            
+        #o,o_sr = librosa.load(self.audio_file, sr=None)
         y = librosa.resample(o, orig_sr=o_sr, target_sr=target_sr)
 
         #pad end to get non-fractional number of clips

@@ -1,6 +1,13 @@
-models/*
-checkpoints/*
-.ipynb_checkpoints/*
 .vscode/*
 koemoe/__pycache__/*
+
+models/*
+checkpoints/*
+
+.ipynb_checkpoints/*
+
+
 koemoe/model/*
+!koemoe/model/.gitkeep
+
+test_media/*

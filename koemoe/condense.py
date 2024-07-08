@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from utils import *
 from sample import Sample
 from segment import Segments
+from os import environ
+from tempfile import TemporaryDirectory
 
 status:enlighten.StatusBar = manager.status_bar(status_format=u'[Koemoe]{fill}{stage}{fill}{elapsed}',
                                     color='bold_underline_mistyrose_on_firebrick1',
@@ -83,7 +85,7 @@ if newest == "None":
     status.update(stage="Error".upper(), force=True)
     print("ERROR: No model files found. Please check https://github.com/mcgrizzz/Koemoe/releases for the latest model")
     sys.exit()
-print(f'INFO: Loading \'{newest}\' using \`{device}\` ...')
+print(f'INFO: Loading \'{newest}\' using \'{device}\' ...')
 model_path = Path("model/") / newest
 model = torch.load(model_path, map_location=device)
 #model.to(device)
@@ -91,6 +93,10 @@ model.eval()
 print(f'INFO: Model Loaded')
 
 bs = 128 if device.type != "cpu" else 32
+
+with TemporaryDirectory() as tmp_cache:
+    print(f'INFO: Temporary Cache Dir {tmp_cache}')
+    environ["NUMBA_CACHE_DIR"] = tmp_cache
 
 status.update(stage="Generating Audio Files".upper())
 sub_progress: TieredCounter = manager.counter(desc="Generating Audio:", total=len(input_files))
