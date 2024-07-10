@@ -47,8 +47,8 @@ sample_map = {}
 if input.is_file():
     input_files.append(input)
 else:
-    mkvs = list(map(lambda x: Path(x), glob.glob(str(input) + "/*.mkv")))
-    mp4s = list(map(lambda x: Path(x), glob.glob(str(input) + "/*.mp4")))
+    mkvs = [p for p in Path(input).rglob("*") if p.suffix.lower() == ".mkv"]
+    mp4s = [p for p in Path(input).rglob("*") if p.suffix.lower() == ".mp4"]
     input_files += mkvs
     input_files += mp4s
 
