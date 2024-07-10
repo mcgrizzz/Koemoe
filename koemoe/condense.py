@@ -46,9 +46,11 @@ sample_map = {}
 
 if input.is_file():
     input_files.append(input)
+    temp_dir = input.parent / "temp"
 else:
-    mkvs = list(map(lambda x: Path(x), glob.glob(str(input) + "/*.mkv")))
-    mp4s = list(map(lambda x: Path(x), glob.glob(str(input) + "/*.mp4")))
+    temp_dir = input / "temp"
+    mkvs = [p for p in Path(input).rglob("*") if p.suffix.lower() == ".mkv"]
+    mp4s = [p for p in Path(input).rglob("*") if p.suffix.lower() == ".mp4"]
     input_files += mkvs
     input_files += mp4s
 
@@ -57,7 +59,6 @@ if not len(input_files):
     print("ERROR: No input files found")
     sys.exit()
     
-temp_dir = input_files[0].parent / "temp"
 if temp_dir.exists():
     print(f'INFO: {str(temp_dir)} Exists')
 else:
@@ -65,7 +66,7 @@ else:
     print(f'INFO: {str(temp_dir)} Created')
 
 if not args.output_dir:
-    output_dir = input_files[0].parent / "outputs"
+    output_dir = temp_dir.parent / "outputs"
 else:
     output_dir = args.output_dir
 
@@ -94,10 +95,6 @@ print(f'INFO: Model Loaded')
 
 bs = 128 if device.type != "cpu" else 32
 
-with TemporaryDirectory() as tmp_cache:
-    print(f'INFO: Temporary Cache Dir {tmp_cache}')
-    environ["NUMBA_CACHE_DIR"] = tmp_cache
-
 status.update(stage="Generating Audio Files".upper())
 sub_progress: TieredCounter = manager.counter(desc="Generating Audio:", total=len(input_files))
 for input_file in input_files:
@@ -108,46 +105,51 @@ for input_file in input_files:
     sample_map[input_file] = sample
     sub_progress.update()
 
-status.update(stage="Processing Files".upper())
-sub_progress: TieredCounter = manager.counter(desc="Processing Samples:", total=len(input_files))
-for input_file in input_files:
-    sample: Sample = sample_map[input_file]
-    
-    sample_progress: TieredCounter = manager.counter(level=1, keep_children=False, desc=f'{sample.name}', total=5)
-    print(f'INFO: -- {sample.name} -- ')
-    
-    sample.load_audio(sr, len_samples)
-    sample_progress.update()
-    print(f'INFO: Audio Loaded')
-    input_total_time += sample.sample_data.o.shape[0]/sample.sample_data.o_sr
-    
-    #sub_progress.set_description("Generating Model Inputs")
-    sample.generate_inputs(bs, device)
-    sample_progress.update()
-    print(f'INFO: Inputs Generated')
-    
-    #sub_progress.set_description("Running Inference")
-    outputs = sample.infer(model)
-    sample_progress.update()
-    print(f'INFO: Inference Completed')
-    
-    #sub_progress.set_description("Processing Outputs")
-    segments = Segments(outputs)
-    processed = segments.get_segments(len_samples, *sample.get_args())
-    sample_progress.update()
-    print(f'INFO: Model Outputs Processed')
-    
-    #sub_progress.set_description("Saving File")
-    output_time = sample.save_output(processed)
-    sample.reset()
-    segments.reset()
-    sample_progress.update()
-    sample_progress.close()
-    sub_progress.update()
-    print(f'INFO: Saved output to "{str(sample.output_file)}"')
-    
-    output_total_time += output_time
-    
+with TemporaryDirectory() as tmp_cache:
+    print(f'INFO: Temporary Cache Dir {tmp_cache}')
+    environ["NUMBA_CACHE_DIR"] = tmp_cache
+
+    status.update(stage="Processing Files".upper())
+    sub_progress: TieredCounter = manager.counter(desc="Processing Samples:", total=len(input_files))
+    for i in range(len(input_files)):
+        input_file = input_files[i]
+        sample: Sample = sample_map[input_file]
+        
+        sample_progress: TieredCounter = manager.counter(level=1, keep_children=False, desc=f'[{i + 1}] - {truncate_file_name(sample.name, 45)}', total=5)
+        print(f'INFO: -- {sample.name} -- ')
+        
+        sample.load_audio(sr, len_samples)
+        sample_progress.update()
+        print(f'INFO: Audio Loaded')
+        input_total_time += sample.sample_data.o.shape[0]/sample.sample_data.o_sr
+        
+        #sub_progress.set_description("Generating Model Inputs")
+        sample.generate_inputs(bs, device)
+        sample_progress.update()
+        print(f'INFO: Inputs Generated')
+        
+        #sub_progress.set_description("Running Inference")
+        outputs = sample.infer(model)
+        sample_progress.update()
+        print(f'INFO: Inference Completed')
+        
+        #sub_progress.set_description("Processing Outputs")
+        segments = Segments(outputs)
+        processed = segments.get_segments(len_samples, *sample.get_args())
+        sample_progress.update()
+        print(f'INFO: Model Outputs Processed')
+        
+        #sub_progress.set_description("Saving File")
+        output_time = sample.save_output(processed)
+        sample.reset()
+        segments.reset()
+        sample_progress.update()
+        sample_progress.close()
+        sub_progress.update()
+        print(f'INFO: Saved output to "{str(sample.output_file)}"')
+        
+        output_total_time += output_time
+
 status.update(stage="Cleaning Up".upper(), force=True)
 temps = os.listdir(temp_dir)
 cleanup: TieredCounter = manager.counter(desc="Cleaning up:", total=len(temps) + 1)

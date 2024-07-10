@@ -7,6 +7,7 @@ import librosa
 import torch
 import math
 
+from ffprobe3 import FFaudioStream
 from pathlib import Path
 from ffmpeg import FFmpeg, FFmpegError
 from dataclasses import dataclass, field
@@ -39,28 +40,36 @@ class Sample:
         self.audio_file = self.temp_dir / (self.name + '.wav')
         
     def generate_audio(self):
-        #codec_map = {"aac": "m4a", "mp3": "mp3", "opus": "opus", "vorbis": "ogg"}
+        codec_map = { "mp3": "mp3", "opus": "opus", "vorbis": "ogg"}
+        # "aac": "m4a" cannot load m4a downstream
+        ffprobe_output = ffprobe3.probe(str(self.input_file)) 
+
+        audio_index = 0 #default to 
+        for i in range(len(ffprobe_output.audio)):
+            s = ffprobe_output.audio[i]
+            tags = s.parsed_json['tags']
+            if "language" not in tags:
+                break
+            if tags["language"] == "jpn":
+                audio_index = i
+                break
+        
+        audio_stream: FFaudioStream = ffprobe_output.audio[audio_index]
+        ext = "flac" #default to flac (free lossless audio codec) if no other supported files
+        if audio_stream.codec_name in codec_map.keys():
+            ext = codec_map[audio_stream.codec_name]
+        
+        self.audio_file = self.temp_dir / (self.name + '.' + ext)
+        
         if not self.audio_file.exists():
-            ffprobe_output = ffprobe3.probe(str(self.input_file))    
-
-            audio_index = 0 #default to 
-            for i in range(len(ffprobe_output.audio)):
-                s = ffprobe_output.audio[i]
-                tags = s.parsed_json['tags']
-                if "language" not in tags:
-                    break
-                if tags["language"] == "jpn":
-                    audio_index = i
-                    break
-
+            args = {"map":("0:a:" + str(audio_index))}
             ffmpeg = (
                 FFmpeg()
                 .input(str(self.input_file))
                 .option("vn")
                 .output(
-                    self.temp_dir / (self.name + '.wav'),
-                    map=["0:a:" + str(audio_index)],
-                    acodec="pcm_s16le",
+                    self.audio_file,
+                    **args
                 )
             )
             try:

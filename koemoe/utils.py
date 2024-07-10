@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-
+import re
 import sys
 import warnings
 import enlighten
@@ -13,7 +13,29 @@ from enlighten._counter import Counter
 from functools import partial
 from dataclasses import dataclass, field
 
-progress_colors = [[237, 226, 225], [237, 205, 202], [237, 172, 166], [238, 124, 114]]
+progress_colors = [[237, 226, 225], [247, 117, 105]]
+
+def generate_colors(progress_colors):
+    new_colors = []
+    steps = 100/(len(progress_colors) - 1)
+    for i in range(100):
+        x = int(i/steps)
+        y = x + 1
+        
+        x = progress_colors[x]
+        y = progress_colors[y]
+        
+        if i % steps == 0:
+            new_colors.append(x)
+            
+        degree = (i % steps)/steps
+        r_new = int((y[0] - x[0])*degree + x[0])
+        g_new =  int((y[1] - x[1])*degree + x[1])
+        b_new =  int((y[2] - x[2])*degree + x[2])
+
+        new_colors.append([r_new, g_new, b_new])
+    
+    return new_colors
 
 class TieredCounter(Counter):
     level: int
@@ -109,6 +131,7 @@ def get_manager(stream=None, **kwargs):
     kwargs['enabled'] = isatty and kwargs.get('enabled', True)
     return TieredManager(stream=stream, counter_class=TieredCounter, **kwargs)
 
+progress_colors = generate_colors(progress_colors)
 manager: TieredManager = get_manager()
 
 @contextlib.contextmanager
@@ -127,3 +150,13 @@ def get_latest_model():
         if version > latest_version[1]:
             latest_version = (file_name, version)
     return latest_version[0]
+
+def truncate_file_name(name: str, width: int):
+    filename = name.lower()
+    table = filename.maketrans("[]", "()")
+    filename = filename.translate(table)
+    filename = re.sub("\(.*?\)","", filename) #delete inside of brackets and parentheses
+    filename = filename.strip().title()
+    width = min(len(filename), width)
+    filename = filename[:width]
+    return filename

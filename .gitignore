@@ -1,11 +1,13 @@
 .vscode/*
-koemoe/__pycache__/*
+koemoe/__pycache__/
+koemoe/tools/__pycache__/
 
-models/*
-checkpoints/*
+nbs/models/*
+nbs/checkpoints/*
+
+koemoe/tools/
 
 .ipynb_checkpoints/*
-
 
 koemoe/model/*
 !koemoe/model/.gitkeep
