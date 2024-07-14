@@ -5,7 +5,7 @@ import os
 import glob
 import shutil
 import argparse
-
+import asyncio
 import enlighten
 from enlighten._util import format_time
 from pathlib import Path
@@ -95,14 +95,17 @@ print(f'INFO: Model Loaded')
 
 bs = 128 if device.type != "cpu" else 32
 
+
 status.update(stage="Generating Audio Files".upper())
 sub_progress: TieredCounter = manager.counter(desc="Generating Audio:", total=len(input_files))
+
 for input_file in input_files:
     cmd_args = { "output_dir":output_dir, "output_format":args.output_format, "include_op":args.include_op, "include_ed": args.include_ed}
     sample = Sample(input_file=input_file, temp_dir=temp_dir, target_sr=sr, **cmd_args)
+    sample_map[input_file] = sample
+    print(f'INFO: Audio Generating for "{str(sample.input_file)}"')
     sample.generate_audio()
     print(f'INFO: Audio Generated and saved to "{str(sample.audio_file)}"')
-    sample_map[input_file] = sample
     sub_progress.update()
 
 with TemporaryDirectory() as tmp_cache:

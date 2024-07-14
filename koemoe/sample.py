@@ -1,7 +1,7 @@
 import soundfile as sf
 import numpy as np
 from utils import *
-import patch_ffprobe
+import patch_ffmpeg as patch_ffmpeg
 import ffprobe3
 import librosa
 import torch
@@ -10,7 +10,7 @@ import math
 from ffprobe3 import FFaudioStream
 from pathlib import Path
 from ffmpeg import FFmpeg, FFmpegError
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

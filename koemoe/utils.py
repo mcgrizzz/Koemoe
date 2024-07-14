@@ -15,10 +15,10 @@ from dataclasses import dataclass, field
 
 progress_colors = [[237, 226, 225], [247, 117, 105]]
 
-def generate_colors(progress_colors):
+def generate_colors(progress_colors, num: int = 100):
     new_colors = []
-    steps = 100/(len(progress_colors) - 1)
-    for i in range(100):
+    steps = num/(len(progress_colors) - 1)
+    for i in range(num):
         x = int(i/steps)
         y = x + 1
         

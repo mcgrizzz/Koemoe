@@ -1,6 +1,10 @@
+import ffmpeg.asyncio
 import ffprobe3.ffprobe3
+import ffmpeg
+
 from ffprobe3.ffprobe3 import _URI_SCHEME, _SPLIT_COMMAND_LINE, FFprobe
 from ffprobe3.exceptions import *
+from ffmpeg.utils import readlines
 
 import os
 import subprocess
@@ -72,4 +76,27 @@ def probe(media_filename, *,
 
     return FFprobe(split_cmdline=split_cmdline, parsed_json=parsed_json)
 
+#Solution from: https://github.com/jonghwanhyeon/python-ffmpeg/pull/56
+def _handle_stderr(self) -> str:
+    assert self._process.stderr is not None
+    line = ""
+    for line_bytes in readlines(self._process.stderr):
+        line = line_bytes.decode(errors="backslashreplace")
+        self.emit("stderr", line)
+
+    self._process.stderr.close()
+    return line
+
+async def _handle_stderr_async(self) -> str:
+    assert self._process.stderr is not None
+
+    line = ""
+    async for line_bytes in readlines(self._process.stderr):
+        line = line_bytes.decode(errors="backslashreplace")
+        self.emit("stderr", line)
+
+    return line
+
+ffmpeg.FFmpeg._handle_stderr = _handle_stderr
+ffmpeg.asyncio.FFmpeg._handle_stderr = _handle_stderr_async
 ffprobe3.probe = probe
